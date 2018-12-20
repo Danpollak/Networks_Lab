@@ -17,15 +17,15 @@ class TCPServerMultithreaded {
                 Socket clientSocket = proxySocket.accept();
                 // listen to client connections
                 // open data streams to read and write to client
-                BufferedInputStream inFromClient = new BufferedInputStream(clientSocket.getInputStream());
-                BufferedOutputStream outToClient = new BufferedOutputStream(clientSocket.getOutputStream());
+                InputStream inFromClient = clientSocket.getInputStream();
+                OutputStream outToClient = clientSocket.getOutputStream();
 
                 // init threads
-                Runnable clientThread = new ClientThread(clientSocket, inFromClient, outToClient, executor);
+                Runnable proxyConnection = new ProxyConnection(clientSocket, inFromClient, outToClient);
 
                 System.out.println("running new thread worker");
                 // run threads
-                executor.execute(clientThread);
+                executor.execute(proxyConnection);
             }
         } catch (Exception e) {
             System.err.println("Connection error: couldn't assign threads to clients - got error " + e);
