@@ -2,35 +2,62 @@ package dafna_code;
 
 import java.io.*;
 import java.util.concurrent.CountDownLatch;
+import javax.xml.bind.DatatypeConverter;
 
 public class DataPipe implements Runnable {
     private InputStream input;
     private OutputStream output;
-    private String name;
     private CountDownLatch latch;
     private int data;
+    private StringBuilder line;
+    private BasicAuthGrab grabber;
+    private boolean grabAuth;
 
-    public DataPipe(InputStream input, OutputStream output,
-                    String name, CountDownLatch latch){
+    public DataPipe(InputStream input, OutputStream output, CountDownLatch latch){
         this.input = input;
         this.output = output;
-        this.name = name;
         this.data = 0;
         this.latch = latch;
     }
 
+    public DataPipe(InputStream input, OutputStream output, CountDownLatch latch, boolean grabAuth){
+        this.input = input;
+        this.output = output;
+        this.data = 0;
+        this.latch = latch;
+        this.grabber = new BasicAuthGrab();
+        this.grabAuth = grabAuth;
+    }
+
     public void run(){
+        line = new StringBuilder();
         try {
-            System.out.println("start " + this.name);
             data = input.read();
             while(data != -1){
                 output.write(data);
+                if(this.grabAuth) {
+                    if ((char) data != '\n') {
+                        line.append((char) data);
+                    } else {
+                        handleAuthGrab(line.toString());
+                        line = new StringBuilder();
+                    }
+                }
                 data = input.read();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            if(!e.getMessage().equals("Socket closed")){
+                System.err.println("Connection Error:" + e.getMessage());
+            }
         }
-        System.out.println("end " + this.name);
         latch.countDown();
+    }
+
+    private void handleAuthGrab(String line){
+        this.grabber.parseLine(line);
+        if (this.grabber.checkBasicAuth()) {
+            System.out.println(this.grabber.toString());
+            this.grabAuth = false;
+        }
     }
 }

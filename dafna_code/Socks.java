@@ -5,7 +5,6 @@ public class Socks {
     private int cd;
     private int dstport;
     private String address;
-    private boolean valid;
 
     public Socks (byte[] data){
         // TODO: Handle bad requests. if bad, valid is false;
@@ -17,7 +16,6 @@ public class Socks {
         for(int i=5;i<8;i++) {
             this.address+= "." + (data[i] & 0xFF);
         }
-        this.valid = true;
     }
 
     public int getVersion(){
@@ -36,8 +34,17 @@ public class Socks {
         return this.address;
     }
 
-    public boolean isValid() {
-        return this.valid;
+    public String validate() {
+        if(vn != 4){
+            return "Unsupported SOCKS protocol version (got " + vn + ")";
+        }
+        if(cd != 1){
+            return "Command code not recognized";
+        }
+        if(dstport < 0){
+            return "Invalid port";
+        }
+        return "ACK";
     }
 
     public String toString() {

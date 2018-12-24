@@ -1,16 +1,13 @@
 package dafna_code;
-
-import com.sun.security.ntlm.Client;
-import sun.rmi.transport.tcp.TCPConnection;
-
 import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class ProxyConnection implements Runnable {
+    private ServerSocket server;
     private Socket clientSocket;
     private Socket destSocket;
     private InputStream clientInput;
@@ -21,7 +18,8 @@ public class ProxyConnection implements Runnable {
     ExecutorService executor = Executors.newFixedThreadPool(2);
 
 
-    public ProxyConnection(Socket clientSocket, InputStream clientInput, OutputStream clientOutput){
+    public ProxyConnection(ServerSocket server, Socket clientSocket, InputStream clientInput, OutputStream clientOutput){
+        this.server = server;
         this.clientSocket = clientSocket;
         this.clientInput = clientInput;
         this.clientOutput = clientOutput;
@@ -33,66 +31,99 @@ public class ProxyConnection implements Runnable {
         CountDownLatch latch = new CountDownLatch(1);
 
         try {
-            // TODO: Handle bad request
             this.clientInput.read(socksRequest);  //read
-            System.out.println("Read Socks Request");
-            System.out.println(socksRequest[0]);
             this.socks = new Socks(socksRequest);
-            System.out.println("Initialized socks class");
-            System.out.println(this.socks.toString());
         } catch (IOException e) {
-            System.err.println(e.getMessage());
+            System.err.println("Connection Error:" + e.getMessage());
+            closeConnection();
+            return;
+        }
+
+        // Handle bad socks values
+        if(socks.validate() != "ACK"){
+            System.err.println("Connection Error: While parsing SOCKS request: " + socks.validate());
+            closeConnection();
+            return;
         }
         // Send SOCKS ACK to client
         try {
-            this.clientOutput.write(this.socksACK(this.socks.isValid()));
+            this.clientOutput.write(this.socksACK(this.socks.validate()));
             this.clientOutput.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Connection Error: Failed to send SOCKS ACK to client");
+            closeConnection();
+            return;
         }
+
         // Create Dest socket
         try {
             this.destSocket= new Socket(socks.getAddress(), socks.getDestinationPort());
             this.destInput = this.destSocket.getInputStream();
             this.destOutput = this.destSocket.getOutputStream();
+            this.destSocket.setSoTimeout(500);
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Connection Error: Failed to connect to host");
+            closeConnection();
+            return;
         }
+        // Send Successful Connection
+        System.out.println("Successful connection from "
+                + getSocketAddress(this.server) + " to " + getSocketAddress(this.destSocket));
 
         // Create data piping
-        DataPipe ClientToDest = new DataPipe(clientInput, destOutput, "clientToDest", latch);
-        DataPipe DestToClient = new DataPipe(destInput, clientOutput, "destToClient", latch);
+        DataPipe ClientToDest = new DataPipe(clientInput, destOutput, latch, true);
+        DataPipe DestToClient = new DataPipe(destInput, clientOutput, latch);
         executor.submit(ClientToDest);
         executor.submit(DestToClient);
         try {
             latch.await();
-            executor.awaitTermination(1, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            e.printStackTrace();
         }
 
         // Close all connections
-        try {
-            this.destSocket.shutdownInput();
-            this.destSocket.shutdownOutput();
-            this.clientSocket.shutdownInput();
-            this.clientSocket.shutdownOutput();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                this.clientSocket.close();
-                this.destSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        System.out.println("ended proxy");
+        closeConnection();
     }
 
-    private byte[] socksACK(boolean valid) {
+    private byte[] socksACK(String valid) {
         // first byte is version, 2nd byte is code, other bytes ignored.
-        byte[] ACK = {0, (byte)(valid ? 90 : 91), 0, 0, 0, 0, 0, 0 };
+        byte[] ACK = {0, (byte)(valid == "ACK" ? 90 : 91), 0, 0, 0, 0, 0, 0 };
         return ACK;
+    }
+
+    private String getSocketAddress(Socket s){
+        return s.getLocalSocketAddress().toString().substring(1);
+    }
+
+    private String getSocketAddress(ServerSocket s){
+        String str = s.getLocalSocketAddress().toString();
+        return str.substring(str.indexOf('/')+1);
+
+    }
+
+    private void closeConnection(){
+        // close threads
+        executor.shutdown();
+
+        // try to close host socket (if open)
+        if(this.destSocket != null && !this.destSocket.isClosed()){
+            try{
+                this.destSocket.shutdownInput();
+                this.destSocket.shutdownOutput();
+                this.destSocket.close();
+            } catch (IOException e) {
+            }
+        }
+
+        // try to close client socket
+        if(!this.clientSocket.isClosed()){
+            try{
+                this.clientSocket.shutdownInput();
+                this.clientSocket.shutdownOutput();
+                this.clientSocket.close();
+            } catch (IOException e) {
+            }
+        }
+
+        System.out.println("Closing connection from " + getSocketAddress(this.server));
     }
 }
