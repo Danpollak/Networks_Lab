@@ -1,4 +1,4 @@
-package dafna_code;
+package src;
 
 public class Socks {
     private int vn;

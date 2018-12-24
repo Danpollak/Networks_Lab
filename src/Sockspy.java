@@ -1,9 +1,8 @@
-package dafna_code;
+package src;
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
 class Sockspy {
     public static void main(String argv[]) throws Exception {
         // listen to port 8080 for new clients

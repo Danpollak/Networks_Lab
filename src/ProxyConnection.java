@@ -1,4 +1,5 @@
-package dafna_code;
+package src;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -71,7 +72,7 @@ public class ProxyConnection implements Runnable {
                 + getSocketAddress(this.server) + " to " + getSocketAddress(this.destSocket));
 
         // Create data piping
-        DataPipe ClientToDest = new DataPipe(clientInput, destOutput, latch, true);
+        DataPipe ClientToDest = new DataPipe(clientInput, destOutput, latch, socks.getDestinationPort() == 80);
         DataPipe DestToClient = new DataPipe(destInput, clientOutput, latch);
         executor.submit(ClientToDest);
         executor.submit(DestToClient);

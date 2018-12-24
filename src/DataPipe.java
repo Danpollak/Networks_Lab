@@ -1,8 +1,7 @@
-package dafna_code;
+package src;
 
 import java.io.*;
 import java.util.concurrent.CountDownLatch;
-import javax.xml.bind.DatatypeConverter;
 
 public class DataPipe implements Runnable {
     private InputStream input;
