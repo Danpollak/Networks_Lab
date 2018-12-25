@@ -1,13 +1,18 @@
+/**
+ * This class is used to hold the SOCKS protocol data, parse it and validate it
+ * */
+
 package src;
 
+@SuppressWarnings("StringConcatenationInLoop")
 public class Socks {
     private int vn;
     private int cd;
     private int dstport;
     private String address;
 
+    // The constructor gets a byte array and parse it
     public Socks (byte[] data){
-        // TODO: Handle bad requests. if bad, valid is false;
         this.vn = (data[0] & 0xFF);
         this.cd = (data[1] & 0xFF);
         this.dstport =  (data[3] | (data[2] << 8)) & 0xFFFF;
@@ -34,6 +39,7 @@ public class Socks {
         return this.address;
     }
 
+    // This is a validation method to see if the data from the byte array is a valid SOCKS request
     public String validate() {
         if(vn != 4){
             return "Unsupported SOCKS protocol version (got " + vn + ")";

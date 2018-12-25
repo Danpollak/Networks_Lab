@@ -1,17 +1,20 @@
+/**
+ * This class is used to collect and parse lines from an HTTP request and extract the Basic Authentication parameters.
+ */
+
+
 package src;
 
 import javax.xml.bind.DatatypeConverter;
-import java.io.IOException;
-import java.io.OutputStream;
 
 public class BasicAuthGrab {
     private String path;
     private String host;
     private String basicAuth;
-    final String PATH_PREFIX = "GET ";
-    final String PATH_SUFFIX = " HTTP/1.1\r";
-    final String HOST_PREFIX = "Host: ";
-    final String BASIC_AUTH_PREFIX = "Authorization: Basic ";
+    private final String PATH_PREFIX = "GET ";
+    private final String PATH_SUFFIX = " HTTP/1.1\r";
+    private final String HOST_PREFIX = "Host: ";
+    private final String BASIC_AUTH_PREFIX = "Authorization: Basic ";
 
 
     public BasicAuthGrab(){

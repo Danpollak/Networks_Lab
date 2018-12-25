@@ -1,8 +1,13 @@
+/**
+ * This is a runnable thread that handles both TCP connection for a single SOCKS request.
+ * */
+
 package src;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,12 +32,12 @@ public class ProxyConnection implements Runnable {
     }
 
     public void run(){
-        // get socks request from client
         byte[] socksRequest = new byte[9];
         CountDownLatch latch = new CountDownLatch(1);
 
+        // Try to receive socks request from client
         try {
-            this.clientInput.read(socksRequest);  //read
+            this.clientInput.read(socksRequest);
             this.socks = new Socks(socksRequest);
         } catch (IOException e) {
             System.err.println("Connection Error:" + e.getMessage());
@@ -40,12 +45,13 @@ public class ProxyConnection implements Runnable {
             return;
         }
 
-        // Handle bad socks values
-        if(socks.validate() != "ACK"){
+        // Handle bad SOCKS request
+        if(!Objects.equals(socks.validate(), "ACK")){
             System.err.println("Connection Error: While parsing SOCKS request: " + socks.validate());
             closeConnection();
             return;
         }
+
         // Send SOCKS ACK to client
         try {
             this.clientOutput.write(this.socksACK(this.socks.validate()));
@@ -56,7 +62,7 @@ public class ProxyConnection implements Runnable {
             return;
         }
 
-        // Create Dest socket
+        // Open Dest socket
         try {
             this.destSocket= new Socket(socks.getAddress(), socks.getDestinationPort());
             this.destInput = this.destSocket.getInputStream();
@@ -67,13 +73,15 @@ public class ProxyConnection implements Runnable {
             closeConnection();
             return;
         }
-        // Send Successful Connection
+
+        // Send Successful Connection prompt
         System.out.println("Successful connection from "
                 + getSocketAddress(this.server) + " to " + getSocketAddress(this.destSocket));
 
-        // Create data piping
-        DataPipe ClientToDest = new DataPipe(clientInput, destOutput, latch, socks.getDestinationPort() == 80);
+        // Create data piping threads
         DataPipe DestToClient = new DataPipe(destInput, clientOutput, latch);
+        // Send grabAuth=true if the destination port is 80
+        DataPipe ClientToDest = new DataPipe(clientInput, destOutput, latch, socks.getDestinationPort() == 80);
         executor.submit(ClientToDest);
         executor.submit(DestToClient);
         try {
@@ -85,9 +93,10 @@ public class ProxyConnection implements Runnable {
         closeConnection();
     }
 
+    // Generate byte array as socks ACK.
     private byte[] socksACK(String valid) {
         // first byte is version, 2nd byte is code, other bytes ignored.
-        byte[] ACK = {0, (byte)(valid == "ACK" ? 90 : 91), 0, 0, 0, 0, 0, 0 };
+        byte[] ACK = {0, (byte)(valid.equals("ACK") ? 90 : 91), 0, 0, 0, 0, 0, 0 };
         return ACK;
     }
 
